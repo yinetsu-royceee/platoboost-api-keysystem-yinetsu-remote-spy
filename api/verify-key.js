@@ -17,26 +17,25 @@ export default async function handler(req, res) {
     }
 
     try {
-        // Gumawa ng HMAC signature base sa Platoboost API requirements
-        // (Ito yung sikreto para tanggapin tayo ng server nila)
-        const timestamp = Date.now().toString();
+        // Gumawa ng HMAC Signature base sa C# logic
         const payload = `${ACCOUNT_ID}:${key}:${hwid || "UNKNOWN"}`;
-        
-        let signature = "";
-        if (HMAC_SECRET) {
-            signature = crypto.createHmac('sha256', HMAC_SECRET).update(payload).digest('hex');
-        }
+        const signature = HMAC_SECRET ? crypto.createHmac('sha256', HMAC_SECRET).update(payload).digest('hex') : "";
 
-        // Tawagin ang Platoboost API
-        const response = await fetch(`https://api.platoboost.com/v1/whitelist/validate`, {
+        // Yung totoong endpoint ni Platoboost (hula natin, pero we'll try)
+        const targetUrl = "https://api.platoboost.com/v1/whitelist/validate";
+        
+        // Gagamit tayo ng PROXY para hindi ma-block ni Platoboost ang IP ni Vercel
+        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
+
+        // Tatawagin natin yung proxy na magfoforward ng request kay Platoboost
+        const response = await fetch(proxyUrl, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${API_KEY}`,
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-                'X-Signature': signature,
-                'X-Timestamp': timestamp
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'X-Signature': signature
             },
             body: JSON.stringify({
                 "account_id": parseInt(ACCOUNT_ID),
@@ -45,22 +44,23 @@ export default async function handler(req, res) {
             })
         });
 
+        // Kunin yung sagot
         const textData = await response.text();
         
-        // Subukang i-parse kung JSON, kung hindi, ibalik as text
         let data;
         try {
             data = JSON.parse(textData);
         } catch (e) {
-            return res.status(200).json({ valid: false, error: "Invalid response from Platoboost", raw: textData });
+            return res.status(200).json({ valid: false, raw_text: textData });
         }
         
+        // I-return kung success
         return res.status(200).json({ 
             valid: data.success === true || data.valid === true,
             raw: data
         });
 
     } catch (error) {
-        return res.status(500).json({ valid: false, error: "Fetch Error: " + String(error) });
+        return res.status(500).json({ valid: false, error: "Proxy Error: " + String(error) });
     }
 }
