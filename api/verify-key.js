@@ -17,17 +17,14 @@ export default async function handler(req, res) {
     }
 
     try {
-        // Gumawa ng HMAC Signature base sa C# logic
         const payload = `${ACCOUNT_ID}:${key}:${hwid || "UNKNOWN"}`;
         const signature = HMAC_SECRET ? crypto.createHmac('sha256', HMAC_SECRET).update(payload).digest('hex') : "";
 
-        // Yung totoong endpoint ni Platoboost (hula natin, pero we'll try)
         const targetUrl = "https://api.platoboost.com/v1/whitelist/validate";
         
-        // Gagamit tayo ng PROXY para hindi ma-block ni Platoboost ang IP ni Vercel
-        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
+        // BAGONG PROXY (CORS.LOL) - Mas stable kesa sa allorigins
+        const proxyUrl = `https://api.cors.lol/?url=${encodeURIComponent(targetUrl)}`;
 
-        // Tatawagin natin yung proxy na magfoforward ng request kay Platoboost
         const response = await fetch(proxyUrl, {
             method: 'POST',
             headers: {
@@ -44,7 +41,6 @@ export default async function handler(req, res) {
             })
         });
 
-        // Kunin yung sagot
         const textData = await response.text();
         
         let data;
@@ -54,7 +50,6 @@ export default async function handler(req, res) {
             return res.status(200).json({ valid: false, raw_text: textData });
         }
         
-        // I-return kung success
         return res.status(200).json({ 
             valid: data.success === true || data.valid === true,
             raw: data
