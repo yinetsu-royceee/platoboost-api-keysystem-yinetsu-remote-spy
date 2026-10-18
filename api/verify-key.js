@@ -1,8 +1,11 @@
 export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+    if (req.method === 'OPTIONS') return res.status(200).end();
 
     const { key, hwid } = req.query; 
-    
     const API_KEY = process.env.PLATOBOOST_API_KEY;
     const ACCOUNT_ID = 23570;
 
@@ -11,6 +14,7 @@ export default async function handler(req, res) {
     }
 
     try {
+        // Dito natin tatawagin ang Platoboost API
         const response = await fetch(`https://api.platoboost.com/v1/whitelist/validate`, {
             method: 'POST',
             headers: {
