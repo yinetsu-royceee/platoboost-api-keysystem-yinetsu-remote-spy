@@ -15,24 +15,14 @@ export default async function handler(req, res) {
         return res.status(400).json({ valid: false, error: "No key provided" });
     }
 
-    if (!SECRET) {
-        return res.status(500).json({ valid: false, error: "Missing PLATOBOOST_HMAC_SECRET in Vercel" });
-    }
-
     try {
         const payload = `${ACCOUNT_ID}:${key}:${hwid || "UNKNOWN"}`;
         const signature = crypto.createHmac('sha256', SECRET).update(payload).digest('hex');
 
+        // DIDIRETSO TAYO KAY PLATOBOOST (Walang Proxy)
         const targetUrl = "https://api.platoboost.com/v1/whitelist/validate";
-        
-        // Listahan ng mga proxies na susubukan natin isa-isa
-        const proxies = [
-            `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`,
-            `https://api.cors.lol/?url=${encodeURIComponent(targetUrl)}`,
-            `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(targetUrl)}`
-        ];
 
-        const fetchOptions = {
+        const response = await fetch(targetUrl, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${SECRET}`,
@@ -46,41 +36,15 @@ export default async function handler(req, res) {
                 "key": key,
                 "hwid": hwid || "UNKNOWN"
             })
-        };
+        });
 
-        let responseText = "";
-        let success = false;
-
-        // Loop para subukan lahat ng proxy hanggang may mag-success
-        for (let proxy of proxies) {
-            try {
-                const response = await fetch(proxy, fetchOptions);
-                const text = await response.text();
-                
-                // Kung "Rate limit" o "Error 522" (Proxy issues), skip at subukan yung susunod
-                if (text.includes("Rate limit") || text.includes("522") || text.includes("Error 403") || text.includes("keyless_legacy_url")) {
-                    continue; 
-                }
-                
-                responseText = text;
-                success = true;
-                break; // Gumana! Stop na sa pag-loop
-                
-            } catch (err) {
-                continue; // Kung nag-fail yung fetch, try next proxy
-            }
-        }
-
-        if (!success) {
-            return res.status(200).json({ valid: false, error: "All proxies are currently rate-limited. Please try again later." });
-        }
-
-        // I-parse yung result
+        const textData = await response.text();
+        
         let data;
         try {
-            data = JSON.parse(responseText);
+            data = JSON.parse(textData);
         } catch (e) {
-            return res.status(200).json({ valid: false, raw_text: responseText });
+            return res.status(200).json({ valid: false, raw_text: textData });
         }
         
         return res.status(200).json({ 
