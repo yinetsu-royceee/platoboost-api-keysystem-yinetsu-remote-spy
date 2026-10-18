@@ -8,27 +8,31 @@ export default async function handler(req, res) {
     if (req.method === 'OPTIONS') return res.status(200).end();
 
     const { key, hwid } = req.query;
-    const API_KEY = process.env.PLATOBOOST_API_KEY;
-    const HMAC_SECRET = process.env.PLATOBOOST_HMAC_SECRET;
+    const SECRET = process.env.PLATOBOOST_HMAC_SECRET; // Ito na yung ginamit natin
     const ACCOUNT_ID = "23570";
 
     if (!key) {
         return res.status(400).json({ valid: false, error: "No key provided" });
     }
 
+    if (!SECRET) {
+        return res.status(500).json({ valid: false, error: "Missing PLATOBOOST_HMAC_SECRET in Vercel" });
+    }
+
     try {
+        // HMAC Signature
         const payload = `${ACCOUNT_ID}:${key}:${hwid || "UNKNOWN"}`;
-        const signature = HMAC_SECRET ? crypto.createHmac('sha256', HMAC_SECRET).update(payload).digest('hex') : "";
+        const signature = crypto.createHmac('sha256', SECRET).update(payload).digest('hex');
 
         const targetUrl = "https://api.platoboost.com/v1/whitelist/validate";
         
-        // BAGONG PROXY (CORS.LOL) - Mas stable kesa sa allorigins
-        const proxyUrl = `https://api.cors.lol/?url=${encodeURIComponent(targetUrl)}`;
+        // Gagamit tayo ng ibang proxy para sure na hindi mag-timeout
+        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
 
         const response = await fetch(proxyUrl, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${API_KEY}`,
+                'Authorization': `Bearer ${SECRET}`, // Ginamit din natin yung secret dito
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
